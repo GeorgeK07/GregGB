@@ -40,6 +40,28 @@ uint8_t bit_u3_r8(uint8_t u3, uint8_t r8, uint8_t *F, uint16_t *PC) {
   return 1; // Return number of cycles (in M-cycles)
 }
 
+uint8_t call_cc_n16(int16_t n16, uint8_t F, uint8_t cc, uint16_t *SP, uint16_t *PC, uint8_t *mem_map) {
+  //  Call address n16, pushes address of next instruction (pointed by stack
+  // pointer) to stack if cc is true (0=NZ, 1=NC, 2=Z, 3=C, 4=none), then jumps
+  // to n16
+  if ((cc == 0 && (((F >> 7) & 1)) == 0) || (cc == 1 && (((F >> 4) & 1)) == 0)
+  || (cc == 2 && (((F >> 7) & 1)) == 1) || (cc == 3 && (((F >> 4) & 1)) == 1)
+  || cc == 4) {
+    *PC = *PC + 3; // 3 byte opcode, add 3 to PC
+    // Split program counter into high and low bytes
+    uint8_t PC_HIGH = (*PC >> 8) & 0xff;
+    uint8_t PC_LOW = *PC & 0xff;
+    // Add each byte in correct order to stack
+    mem_map[*SP - 1] = PC_HIGH;
+    mem_map[*SP - 2] = PC_LOW;
+    *PC = n16; // Jump to n16
+    *SP = *SP - 2; // Subtract 2 from stack pointer
+    return 6; // Return number of cycles (in M-cycles)
+  }
+  *PC = *PC + 3; // 3 byte opcode, add 3 to PC
+  return 3; // Return number of cycles (in M-cycles)
+}
+
 uint8_t dec_r8(uint8_t *r8, uint8_t *F, uint16_t *PC) {
   // Decrease r8 by 1
   // Set subtraction flag to 1 and half carry flag to 1 if borrow from bit 4
@@ -136,19 +158,13 @@ uint8_t ld_ff00_n8_A(uint8_t A, uint8_t n8, uint16_t *PC, uint8_t *mem_map) {
   return 3; // Return number of cycles (in M-cycles)
 }
 
-uint8_t ld_r16_r8(uint8_t r8, uint16_t r16, uint16_t *PC, uint8_t *mem_map) {
-  // Store A at memory r16 points to
-  mem_map[r16] = r8;
-  *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
-}
-
-uint8_t ld_HLID_n16(uint8_t A, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC, uint8_t *mem_map, uint8_t is_increment) {
-  // Store A at memory r16 points to
-  // printf("HIGH (BDH): %x LOW (CEL): %x\n", *r8_HIGH, *r8_LOW); // DEBUG
+uint8_t ld_HLID_r8(uint8_t r8, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC, uint8_t *mem_map, uint8_t is_increment) {
+  // Store r8 at memory r16 (HL) points to, then increment or decrement HL
+  // printf("HIGH (BDH): %02x LOW (CEL): %02x\n", *r8_HIGH, *r8_LOW); // DEBUG
+  // printf("r8 VAL: %02x", r8); // DEBUG
   uint16_t r16 = (*r8_HIGH << 8) + *r8_LOW; // Join r8_HIGH and r8_LOW
-  mem_map[r16] = A;
-  // printf("r16: %x\n", r16); // DEBUG
+  mem_map[r16] = r8;
+  // printf("r16: %04x\n", r16); // DEBUG
   // Check if HL should be incremented or decremented
   switch (is_increment) {
     case 0:
@@ -161,30 +177,74 @@ uint8_t ld_HLID_n16(uint8_t A, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC, 
   // Split r8_HIGH and r8_LOW
   *r8_HIGH = (r16 >> 8) & 0xff;
   *r8_LOW = r16 & 0xff;
-  // printf("HIGH (BDH): %x LOW (CEL): %x\n", *r8_HIGH, *r8_LOW); // DEBUG
+  // printf("HIGH (BDH): %02x LOW (CEL): %02x\n", *r8_HIGH, *r8_LOW); // DEBUG
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
   return 2; // Return number of cycles (in M-cycles)
 }
 
-uint8_t ld_r16_n16(uint16_t n16, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC) {
-  // Set r16 to n16
-  // printf("HIGH (BDH): %x LOW (CEL): %x\n", *r8_HIGH, *r8_LOW); // DEBUG
+uint8_t ld_r16_r8(uint8_t r8, uint16_t r16, uint16_t *PC, uint8_t *mem_map) {
+  // Store r8 at memory r16 points to
+  mem_map[r16] = r8;
+  *PC = *PC + 1; // 1 byte opcode, add 1 to PC
+  return 2; // Return number of cycles (in M-cycles)
+}
+
+uint8_t ld_r8_HLID(uint8_t *r8, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC, uint8_t *mem_map, uint8_t is_increment) {
+  // Store memory r16 (HL) points to in r8, then increment or decrement HL
   uint16_t r16 = (*r8_HIGH << 8) + *r8_LOW; // Join r8_HIGH and r8_LOW
-  r16 = n16;
-  // printf("r16: %x\n", r16); // DEBUG
+  *r8 = mem_map[r16];
+  // Check if HL should be incremented or decremented
+  switch (is_increment) {
+    case 0:
+      r16 = r16 - 1;
+      break;
+    case 1:
+      r16 = r16 + 1;
+      break;
+  }
   // Split r8_HIGH and r8_LOW
   *r8_HIGH = (r16 >> 8) & 0xff;
   *r8_LOW = r16 & 0xff;
-  // printf("HIGH (BDH): %x LOW (CEL): %x\n", *r8_HIGH, *r8_LOW); // DEBUG
+  *PC = *PC + 1; // 1 byte opcode, add 1 to PC
+  return 2; // Return number of cycles (in M-cycles)
+}
+
+uint8_t ld_r8_r16(uint8_t *r8, uint8_t r8_HIGH, uint8_t r8_LOW, uint16_t *PC, uint8_t *mem_map) {
+  // Store memory r16 points to in r8
+  uint16_t r16 = (r8_HIGH << 8) + r8_LOW; // Join r8_HIGH and r8_LOW
+  // printf("r16 VAL:%04x\n", r16); // DEBUG
+  // printf("VAL r16 POINTS TO:%02x\n", mem_map[r16]); // DEBUG
+  *r8 = mem_map[r16];
+  *PC = *PC + 1; // 1 byte opcode, add 1 to PC
+  return 2; // Return number of cycles (in M-cycles)
+}
+
+uint8_t ld_r8_dest_r8_src(uint8_t r8_src, uint8_t *r8_dest, uint16_t *PC) {
+  // Set r8_dest to r8_src
+  *r8_dest = r8_src;
+  *PC = *PC + 1; // 1 byte opcode, add 1 to PC
+  return 1; // Return number of cycles (in M-cycles)
+}
+
+uint8_t ld_r16_n16(uint16_t n16, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC) {
+  // Set r16 to n16
+  // printf("HIGH (BDH): %02x LOW (CEL): %02x\n", *r8_HIGH, *r8_LOW); // DEBUG
+  uint16_t r16 = (*r8_HIGH << 8) + *r8_LOW; // Join r8_HIGH and r8_LOW
+  r16 = n16;
+  // printf("r16: %04x\n", r16); // DEBUG
+  // Split r8_HIGH and r8_LOW
+  *r8_HIGH = (r16 >> 8) & 0xff;
+  *r8_LOW = r16 & 0xff;
+  // printf("HIGH (BDH): %02x LOW (CEL): %02x\n", *r8_HIGH, *r8_LOW); // DEBUG
   *PC = *PC + 3; // 3 byte opcode, add 3 to PC
   return 3; // Return number of cycles (in M-cycles)
 }
 
 uint8_t ld_r8_n8(uint8_t n8, uint8_t *r8, uint16_t *PC) {
   // Set r8 to n8
-  // printf("n8: %x\n", n8); // DEBUG
+  // printf("n8: %02x\n", n8); // DEBUG
   *r8 = n8;
-  // printf("r8: %x\n", *r8); // DEBUG
+  // printf("r8: %02x\n", *r8); // DEBUG
   *PC = *PC + 2; // 2 byte opcode, add 2 to PC
   return 2; // Return number of cycles (in M-cycles)
 }
@@ -204,9 +264,10 @@ uint8_t ld_SP_n16(uint16_t n16, uint16_t *SP, uint16_t *PC) {
 }
 
 uint8_t jr_cc_i8(int8_t i8, uint8_t F, uint8_t cc, uint16_t *PC, uint8_t *mem_map) {
-  // Jump to address i8 if cc is true (0=NZ, 1=NC, 2=Z, 3=C)
+  // Jump to address i8 if cc is true (0=NZ, 1=NC, 2=Z, 3=C, 4=none)
   if ((cc == 0 && (((F >> 7) & 1)) == 0) || (cc == 1 && (((F >> 4) & 1)) == 0)
-  || (cc == 2 && (((F >> 7) & 1)) == 1) || (cc == 3 && (((F >> 4) & 1)) == 1)) {
+  || (cc == 2 && (((F >> 7) & 1)) == 1) || (cc == 3 && (((F >> 4) & 1)) == 1)
+  || cc == 4) {
     // printf("i8: %d\n", i8); // DEBUG
     *PC = *PC + 2; // 2 byte opcode, add 2 to PC
     *PC = *PC + i8;
@@ -259,6 +320,16 @@ int main(void) {
   fread(mem_map, 1, 256, rom_ptr); // Reads Boot ROM into start of mem_map
   fclose(rom_ptr); // Close to prevent issues
 
+  //  Reading cartridge into memory (first 32kb minus first 256b that Boot ROM
+  // is in, will overwrite after boot process)
+  rom_ptr = 0;
+  rom_ptr = fopen("C:/Users/BellwetherWealth-Enq/Games/ROMs/GB/Dr. Mario (World).gb", "r");
+  // File ptr, offset, where offset added (SEEK_SET, SEEK_CUR, SEEK_END)
+  fseek(rom_ptr, 0x100, SEEK_SET); // Set place in file to read from
+  // Memory ptr, size of each element (in bytes), number of elements, file ptr
+  fread(mem_map + 0x100, 1, 32512, rom_ptr); // Reads ROM into after Boot ROM
+  fclose(rom_ptr); // Close to prevent issues
+
   // ETC.
   uint8_t is_running = 1;
   uint32_t opcodes_run = 0;
@@ -267,7 +338,7 @@ int main(void) {
 
   // While loop for CPU fetch, decode, execute process
   while (is_running == 1) {
-    // printf("Opcode: %x\n", mem_map[PC]); // DEBUG: Print current byte in hex
+    // printf("Opcode: %02x\n", mem_map[PC]); // DEBUG: Print current byte in hex
     //  Switch statement that checks hex value of current byte, compares with
     // opcode values, and then executes said opcode
     switch (mem_map[PC]) {
@@ -286,6 +357,9 @@ int main(void) {
         break;
       case 0x06:
         cycles = ld_r8_n8(mem_map[PC+1], &B, &PC);
+        break;
+      case 0x0a:
+        cycles = ld_r8_r16(&A, B, C, &PC, mem_map);
         break;
       case 0x0c:
         cycles = inc_r8(&C, &F, &PC);
@@ -311,6 +385,12 @@ int main(void) {
       case 0x16:
         cycles = ld_r8_n8(mem_map[PC+1], &D, &PC);
         break;
+      case 0x18:
+        cycles = jr_cc_i8(mem_map[PC+1], F, 4, &PC, mem_map);
+        break;
+      case 0x1a:
+        cycles = ld_r8_r16(&A, D, E, &PC, mem_map);
+        break;
       case 0x1c:
         cycles = inc_r8(&E, &F, &PC);
         break;
@@ -327,7 +407,7 @@ int main(void) {
         cycles = ld_r16_n16((mem_map[PC+2] << 8) + mem_map[PC+1], &H, &L, &PC);
         break;
       case 0x22:
-        cycles = ld_HLID_n16(A, &H, &L, &PC, mem_map, 1);
+        cycles = ld_HLID_r8(A, &H, &L, &PC, mem_map, 1);
         break;
       case 0x24:
         cycles = inc_r8(&H, &F, &PC);
@@ -337,6 +417,12 @@ int main(void) {
         break;
       case 0x26:
         cycles = ld_r8_n8(mem_map[PC+1], &H, &PC);
+        break;
+      case 0x28:
+        cycles = jr_cc_i8(mem_map[PC+1], F, 2, &PC, mem_map);
+        break;
+      case 0x2a:
+        cycles = ld_r8_HLID(&A, &H, &L, &PC, mem_map, 1);
         break;
       case 0x2c:
         cycles = inc_r8(&L, &F, &PC);
@@ -354,10 +440,142 @@ int main(void) {
         cycles = ld_SP_n16((mem_map[PC+2] << 8) + mem_map[PC+1], &SP, &PC);
         break;
       case 0x32:
-        cycles = ld_HLID_n16(A, &H, &L, &PC, mem_map, 0);
+        cycles = ld_HLID_r8(A, &H, &L, &PC, mem_map, 0);
+        break;
+      case 0x38:
+        cycles = jr_cc_i8(mem_map[PC+1], F, 3, &PC, mem_map);
+        break;
+      case 0x3a:
+        cycles = ld_r8_HLID(&A, &H, &L, &PC, mem_map, 0);
         break;
       case 0x3e:
         cycles = ld_r8_n8(mem_map[PC+1], &A, &PC);
+        break;
+      case 0x40:
+        cycles = ld_r8_dest_r8_src(B, &B, &PC);
+        break;
+      case 0x41:
+        cycles = ld_r8_dest_r8_src(C, &B, &PC);
+        break;
+      case 0x42:
+        cycles = ld_r8_dest_r8_src(D, &B, &PC);
+        break;
+      case 0x43:
+        cycles = ld_r8_dest_r8_src(E, &B, &PC);
+        break;
+      case 0x44:
+        cycles = ld_r8_dest_r8_src(H, &B, &PC);
+        break;
+      case 0x45:
+        cycles = ld_r8_dest_r8_src(L, &B, &PC);
+        break;
+      case 0x47:
+        cycles = ld_r8_dest_r8_src(A, &B, &PC);
+        break;
+      case 0x48:
+        cycles = ld_r8_dest_r8_src(B, &C, &PC);
+        break;
+      case 0x49:
+        cycles = ld_r8_dest_r8_src(C, &C, &PC);
+        break;
+      case 0x4a:
+        cycles = ld_r8_dest_r8_src(D, &C, &PC);
+        break;
+      case 0x4b:
+        cycles = ld_r8_dest_r8_src(E, &C, &PC);
+        break;
+      case 0x4c:
+        cycles = ld_r8_dest_r8_src(H, &C, &PC);
+        break;
+      case 0x4d:
+        cycles = ld_r8_dest_r8_src(L, &C, &PC);
+        break;
+      case 0x4f:
+        cycles = ld_r8_dest_r8_src(A, &C, &PC);
+        break;
+      case 0x50:
+        cycles = ld_r8_dest_r8_src(B, &D, &PC);
+        break;
+      case 0x51:
+        cycles = ld_r8_dest_r8_src(C, &D, &PC);
+        break;
+      case 0x52:
+        cycles = ld_r8_dest_r8_src(D, &D, &PC);
+        break;
+      case 0x53:
+        cycles = ld_r8_dest_r8_src(E, &D, &PC);
+        break;
+      case 0x54:
+        cycles = ld_r8_dest_r8_src(H, &D, &PC);
+        break;
+      case 0x55:
+        cycles = ld_r8_dest_r8_src(L, &D, &PC);
+        break;
+      case 0x57:
+        cycles = ld_r8_dest_r8_src(A, &D, &PC);
+        break;
+      case 0x58:
+        cycles = ld_r8_dest_r8_src(B, &E, &PC);
+        break;
+      case 0x59:
+        cycles = ld_r8_dest_r8_src(C, &E, &PC);
+        break;
+      case 0x5a:
+        cycles = ld_r8_dest_r8_src(D, &E, &PC);
+        break;
+      case 0x5b:
+        cycles = ld_r8_dest_r8_src(E, &E, &PC);
+        break;
+      case 0x5c:
+        cycles = ld_r8_dest_r8_src(H, &E, &PC);
+        break;
+      case 0x5d:
+        cycles = ld_r8_dest_r8_src(L, &E, &PC);
+        break;
+      case 0x5f:
+        cycles = ld_r8_dest_r8_src(A, &E, &PC);
+        break;
+      case 0x60:
+        cycles = ld_r8_dest_r8_src(B, &H, &PC);
+        break;
+      case 0x61:
+        cycles = ld_r8_dest_r8_src(C, &H, &PC);
+        break;
+      case 0x62:
+        cycles = ld_r8_dest_r8_src(D, &H, &PC);
+        break;
+      case 0x63:
+        cycles = ld_r8_dest_r8_src(E, &H, &PC);
+        break;
+      case 0x64:
+        cycles = ld_r8_dest_r8_src(H, &H, &PC);
+        break;
+      case 0x65:
+        cycles = ld_r8_dest_r8_src(L, &H, &PC);
+        break;
+      case 0x67:
+        cycles = ld_r8_dest_r8_src(A, &H, &PC);
+        break;
+      case 0x68:
+        cycles = ld_r8_dest_r8_src(B, &L, &PC);
+        break;
+      case 0x69:
+        cycles = ld_r8_dest_r8_src(C, &L, &PC);
+        break;
+      case 0x6a:
+        cycles = ld_r8_dest_r8_src(D, &L, &PC);
+        break;
+      case 0x6b:
+        cycles = ld_r8_dest_r8_src(E, &L, &PC);
+        break;
+      case 0x6c:
+        cycles = ld_r8_dest_r8_src(H, &L, &PC);
+        break;
+      case 0x6d:
+        cycles = ld_r8_dest_r8_src(L, &L, &PC);
+        break;
+      case 0x6f:
+        cycles = ld_r8_dest_r8_src(A, &L, &PC);
         break;
       case 0x77:
         cycles = ld_r16_r8(A, (mem_map[PC+2] << 8) + mem_map[PC+1], &PC, mem_map);
@@ -401,6 +619,21 @@ int main(void) {
       case 0xaf:
         cycles = xor_a_r8(&A, &A, &F, &PC);
         break;
+      case 0xc4:
+        cycles = call_cc_n16((mem_map[PC+2] << 8) + mem_map[PC+1], F, 0, &SP, &PC, mem_map);
+        break;
+      case 0xcc:
+        cycles = call_cc_n16((mem_map[PC+2] << 8) + mem_map[PC+1], F, 2, &SP, &PC, mem_map);
+        break;
+      case 0xcd:
+        cycles = call_cc_n16((mem_map[PC+2] << 8) + mem_map[PC+1], F, 4, &SP, &PC, mem_map);
+        break;
+      case 0xd4:
+        cycles = call_cc_n16((mem_map[PC+2] << 8) + mem_map[PC+1], F, 1, &SP, &PC, mem_map);
+        break;
+      case 0xdc:
+        cycles = call_cc_n16((mem_map[PC+2] << 8) + mem_map[PC+1], F, 3, &SP, &PC, mem_map);
+        break;
       case 0xe0:
         cycles = ld_ff00_n8_A(A, mem_map[PC+1], &PC, mem_map);
         break;
@@ -415,7 +648,7 @@ int main(void) {
         break;
       case 0xcb: PC++; cycles = 1;
         // Debugging
-        // printf("Opcode: %x\n", mem_map[PC]); // DEBUG: Print current byte in hex
+        // printf("Opcode: %02x\n", mem_map[PC]); // DEBUG: Print current byte in hex
         switch (mem_map[PC]) {
           case 0x40:
             cycles = bit_u3_r8(0, B, &F, &PC);
@@ -586,25 +819,38 @@ int main(void) {
             cycles = bit_u3_r8(7, A, &F, &PC);
             break;
           default:
-            printf("Unemulated opcode %x\n", mem_map[PC]);
+            printf("Unemulated opcode %02x\n", mem_map[PC]);
             return 1;
         } 
         total_cycles = total_cycles + cycles; // Add amount of cycles executed
         break;
       default:
-        printf("Unemulated opcode %x\n", mem_map[PC]);
+        printf("Unemulated opcode %02x\n", mem_map[PC]);
         // Debugging print statements
-        printf("A:%x B:%x C:%x D:%x E:%x F:%x H:%x L:%x\n", A, B, C, D, E, F, H, L);
+        printf("A:%02x B:%02x C:%02x D:%02x E:%02x F:%02x H:%02x L:%02x\n", A, B, C, D, E, F, H, L);
         printf("Z:%x N:%x H:%x C:%x\n", (F >> 7) & 1, (F >> 6) & 1, (F >> 5) & 1, (F >> 4) & 1);
-        printf("PC:%x SP:%x\n", PC, SP); // Print program counter and stack pointer
+        printf("PC:%04x SP:%04x\n", PC, SP); // Print program counter and stack pointer
         printf("OPCODES RUN: %d\n", opcodes_run); // Print total opcodes run
         printf("TOTAL CYCLES: %d\n\n", total_cycles); // Print total cycles
+        // For loop that prints mem_map
+        printf("MEM_MAP:\n");
+        for (int i = 0; i < 65536; i++) {
+          // Check if first byte, if so, print offset
+          if ((i & 0x0f) == 0x00) { // Bitmask top and check if bottom byte equals 0x00
+            printf("0x%04x ", i);
+          }
+          printf("%02x ", mem_map[i]); // Print current hex value
+          // Check if last byte, if so, print line end
+          if ((i & 0x0f) == 0x0f) { // Bitmask top and check if bottom byte equals 0x0f
+            printf("\n");
+          }
+        }
         return 1;
     }
     // Debugging print statements
-    // printf("A:%x B:%x C:%x D:%x E:%x F:%x H:%x L:%x\n", A, B, C, D, E, F, H, L);
+    // printf("A:%02x B:%02x C:%02x D:%02x E:%02x F:%02x H:%02x L:%02x\n", A, B, C, D, E, F, H, L);
     // printf("Z:%x N:%x H:%x C:%x\n", (F >> 7) & 1, (F >> 6) & 1, (F >> 5) & 1, (F >> 4) & 1);
-    // printf("PC:%x SP:%x\n", PC, SP); // Print program counter and stack pointer
+    // printf("PC:%04x SP:%04x\n", PC, SP); // Print program counter and stack pointer
     opcodes_run++; // Add 1 to opcodes_run
     // printf("OPCODES RUN: %d\n", opcodes_run); // Print total opcodes run
     total_cycles = total_cycles + cycles; // Add amount of cycles executed
