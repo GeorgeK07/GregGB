@@ -62,18 +62,54 @@ uint8_t call_cc_n16(int16_t n16, uint8_t F, uint8_t cc, uint16_t *SP, uint16_t *
   return 3; // Return number of cycles (in M-cycles)
 }
 
-void debug(uint8_t A, uint8_t B, uint8_t C, uint8_t D, uint8_t E, uint8_t F, uint8_t H, uint8_t L, uint16_t PC, uint16_t SP, uint32_t opcodes_run, uint32_t total_cycles, uint8_t *mem_map, uint8_t is_cb_opcode) {
-  // Debugging print statements
-  switch (is_cb_opcode) {
-    case 1:
-      printf("From cb\n");
+uint8_t cp_A_n8_OR_r8(uint8_t A, uint8_t n8_OR_r8, uint8_t *F, uint16_t *PC, uint8_t is_n8) {
+  // Subtract n8_OR_r8 from A and set flags accordingly, but don't store result
+  // Set half carry flag if borrow from bit 4
+  switch (((A & 0x0f) - (n8_OR_r8 & 0x0f)) & 0x10) {
+    case 0x10:
+      *F |= 1 << 5;
+      break;
+    default:
+      *F &= ~(1 << 5);
   }
-  printf("Unemulated opcode %02x\n", mem_map[PC]);
-  printf("A:%02x B:%02x C:%02x D:%02x E:%02x F:%02x H:%02x L:%02x\n", A, B, C, D, E, F, H, L);
-  printf("Z:%x N:%x H:%x C:%x\n", (F >> 7) & 1, (F >> 6) & 1, (F >> 5) & 1, (F >> 4) & 1);
-  printf("PC:%04x SP:%04x\n", PC, SP); // Print program counter and stack pointer
-  printf("OPCODES RUN: %d\n", opcodes_run); // Print total opcodes run
-  printf("TOTAL CYCLES: %d\n\n", total_cycles); // Print total cycles
+  // Set carry flag to 1 if n8_OR_r8 > A
+  if (n8_OR_r8 > A) {
+    *F |= 1 << 4;
+  } else {
+    *F &= ~(1 << 4);
+  }
+  // printf("BEFORE A:%02x n8_OR_r8: %02x\n", A, n8_OR_r8); // DEBUG
+  A = A - n8_OR_r8;
+  // printf("AFTER A:%02x n8_OR_r8: %02x\n", A, n8_OR_r8); // DEBUG
+  // printf("BEFORE F: %x\n", *F); // DEBUG
+  // If result is zero, set zero flag to 1, if not, 0
+  switch (A) {
+    case 0:
+      *F |= 1 << 7;
+      break;
+    default:
+      *F &= ~(1 << 7);
+  }
+  // Set subtraction flag to 1
+  *F |= 1 << 6;
+  // printf("AFTER F: %x\n", *F); // DEBUG
+  // Switch between n8 and r8 PC and cycle amount depending on is_n8's value
+  switch (is_n8) {
+    case 0: // r8
+      *PC = *PC + 1; // 1 byte opcode, add 1 to PC
+      return 1; // Return number of cycles (in M-cycles)
+      break;
+    case 1: // n8
+      *PC = *PC + 2; // 2 byte opcode, add 2 to PC
+      return 2; // Return number of cycles (in M-cycles)
+      break;
+    default:
+      printf("This shouldn't happen");
+      exit(1); // Exit program with error
+  }
+}
+
+void debug(uint8_t A, uint8_t B, uint8_t C, uint8_t D, uint8_t E, uint8_t F, uint8_t H, uint8_t L, uint16_t PC, uint16_t SP, uint32_t opcodes_run, uint32_t total_cycles, uint8_t *mem_map, uint8_t is_cb_opcode) {
   // For loop that prints mem_map
   printf("MEM_MAP:\n");
   for (int i = 0; i < 65536; i++) {
@@ -89,7 +125,18 @@ void debug(uint8_t A, uint8_t B, uint8_t C, uint8_t D, uint8_t E, uint8_t F, uin
         printf("\n");
     }
   }
-  exit(1);
+  // Debugging print statements
+  switch (is_cb_opcode) {
+    case 1:
+      printf("From cb\n");
+  }
+  printf("Unemulated opcode %02x\n", mem_map[PC]);
+  printf("A:%02x B:%02x C:%02x D:%02x E:%02x F:%02x H:%02x L:%02x\n", A, B, C, D, E, F, H, L);
+  printf("Z:%x N:%x H:%x C:%x\n", (F >> 7) & 1, (F >> 6) & 1, (F >> 5) & 1, (F >> 4) & 1);
+  printf("PC:%04x SP:%04x\n", PC, SP); // Print program counter and stack pointer
+  printf("OPCODES RUN: %d\n", opcodes_run); // Print total opcodes run
+  printf("TOTAL CYCLES: %d\n", total_cycles); // Print total cycles
+  exit(1); // Exit program with error
 }
 
 uint8_t dec_r8(uint8_t *r8, uint8_t *F, uint16_t *PC) {
@@ -262,8 +309,16 @@ uint8_t ld_HLID_r8(uint8_t r8, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC, 
   return 2; // Return number of cycles (in M-cycles)
 }
 
-uint8_t ld_r16_r8(uint8_t r8, uint16_t r16, uint16_t *PC, uint8_t *mem_map) {
+uint8_t ld_n16_r8(uint8_t r8, uint16_t n16, uint16_t *PC, uint8_t *mem_map) {
+  // Store r8 at memory n16 points to
+  mem_map[n16] = r8;
+  *PC = *PC + 3; // 3 byte opcode, add 3 to PC
+  return 4; // Return number of cycles (in M-cycles)
+}
+
+uint8_t ld_r16_r8(uint8_t r8, uint8_t r8_HIGH, uint8_t r8_LOW, uint16_t *PC, uint8_t *mem_map) {
   // Store r8 at memory r16 points to
+  uint16_t r16 = (r8_HIGH << 8) + r8_LOW; // Join r8_HIGH and r8_LOW
   mem_map[r16] = r8;
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
   return 2; // Return number of cycles (in M-cycles)
@@ -688,6 +743,9 @@ int main(void) {
       case 0x3a:
         cycles = ld_r8_HLID(&A, &H, &L, &PC, mem_map, 0);
         break;
+      case 0x3d:
+        cycles = dec_r8(&A, &F, &PC);
+        break;
       case 0x3e:
         cycles = ld_r8_n8(mem_map[PC+1], &A, &PC);
         break;
@@ -817,8 +875,47 @@ int main(void) {
       case 0x6f:
         cycles = ld_r8_dest_r8_src(A, &L, &PC);
         break;
+      case 0x70:
+        cycles = ld_r16_r8(B, H, L, &PC, mem_map);
+        break;
+      case 0x71:
+        cycles = ld_r16_r8(C, H, L, &PC, mem_map);
+        break;
+      case 0x72:
+        cycles = ld_r16_r8(D, H, L, &PC, mem_map);
+        break;
+      case 0x73:
+        cycles = ld_r16_r8(E, H, L, &PC, mem_map);
+        break;
+      case 0x74:
+        cycles = ld_r16_r8(H, H, L, &PC, mem_map);
+        break;
+      case 0x75:
+        cycles = ld_r16_r8(L, H, L, &PC, mem_map);
+        break;
       case 0x77:
-        cycles = ld_r16_r8(A, (mem_map[PC+2] << 8) + mem_map[PC+1], &PC, mem_map);
+        cycles = ld_r16_r8(A, H, L, &PC, mem_map);
+        break;
+      case 0x78:
+        cycles = ld_r8_dest_r8_src(B, &A, &PC);
+        break;
+      case 0x79:
+        cycles = ld_r8_dest_r8_src(C, &A, &PC);
+        break;
+      case 0x7a:
+        cycles = ld_r8_dest_r8_src(D, &A, &PC);
+        break;
+      case 0x7b:
+        cycles = ld_r8_dest_r8_src(E, &A, &PC);
+        break;
+      case 0x7c:
+        cycles = ld_r8_dest_r8_src(H, &A, &PC);
+        break;
+      case 0x7d:
+        cycles = ld_r8_dest_r8_src(L, &A, &PC);
+        break;
+      case 0x7f:
+        cycles = ld_r8_dest_r8_src(A, &A, &PC);
         break;
       case 0x88:
         cycles = adc_a_r8(&A, &B, &F, &PC);
@@ -858,6 +955,27 @@ int main(void) {
         break;
       case 0xaf:
         cycles = xor_a_r8(&A, &A, &F, &PC);
+        break;
+      case 0xb8:
+        cycles = cp_A_n8_OR_r8(A, B, &F, &PC, 0);
+        break;
+      case 0xb9:
+        cycles = cp_A_n8_OR_r8(A, C, &F, &PC, 0);
+        break;
+      case 0xba:
+        cycles = cp_A_n8_OR_r8(A, D, &F, &PC, 0);
+        break;
+      case 0xbb:
+        cycles = cp_A_n8_OR_r8(A, E, &F, &PC, 0);
+        break;
+      case 0xbc:
+        cycles = cp_A_n8_OR_r8(A, H, &F, &PC, 0);
+        break;
+      case 0xbd:
+        cycles = cp_A_n8_OR_r8(A, L, &F, &PC, 0);
+        break;
+      case 0xbf:
+        cycles = cp_A_n8_OR_r8(A, A, &F, &PC, 0);
         break;
       case 0xc0:
         cycles = ret_cc(F, 0, &SP, &PC, mem_map);
@@ -913,6 +1031,9 @@ int main(void) {
       case 0xe5:
         cycles = push_r16(H, L, &SP, &PC, mem_map);
         break;
+      case 0xea:
+        cycles = ld_n16_r8(A, (mem_map[PC+2] << 8) + mem_map[PC+1], &PC, mem_map);
+        break;
       case 0xf0:
         cycles = ld_A_ff00_n8(&A, mem_map[PC+1], &PC, mem_map);
         break;
@@ -924,6 +1045,9 @@ int main(void) {
         break;
       case 0xf5:
         cycles = push_r16(A, F, &SP, &PC, mem_map);
+        break;
+      case 0xfe:
+        cycles = cp_A_n8_OR_r8(A, mem_map[PC+1], &F, &PC, 1);
         break;
       case 0xcb:
         // Debugging
@@ -1149,5 +1273,9 @@ int main(void) {
     }
     opcodes_run++; // Add 1 to opcodes_run
     total_cycles = total_cycles + cycles; // Add amount of cycles executed
+    //printf("A:%02x B:%02x C:%02x D:%02x E:%02x F:%02x H:%02x L:%02x Z:%x N:%x H:%x C:%x PC:%04x SP:%04x OPCODES RUN:%d TOTAL CYCLES:%d\n", A, B, C, D, E, F, H, L, (F >> 7) & 1, (F >> 6) & 1, (F >> 5) & 1, (F >> 4) & 1, PC, SP, opcodes_run, total_cycles);
+    //if (total_cycles >= 100000) { // DEBUG: To stop at a certain number of cycles
+    //  debug(A, B, C, D, E, F, H, L, PC, SP, opcodes_run, total_cycles, mem_map, 0);
+    //}
   }
 }
