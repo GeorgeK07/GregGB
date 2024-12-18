@@ -17,7 +17,7 @@ uint8_t adc_a_r8(uint8_t *A, uint8_t *r8, uint8_t *F, uint16_t *PC) {
   // (*F >> 4) & 1 returns 1 if 4th bit is 1, and 0 if 0
   *A = *A + *r8 + ((*F >> 4) & 1);
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 1; // Return number of cycles (in M-cycles)
+  return 4; // Return number of cycles (in t-cycles)
 }
 
 uint8_t bit_u3_r8(uint8_t u3, uint8_t r8, uint8_t *F, uint16_t *PC) {
@@ -37,7 +37,7 @@ uint8_t bit_u3_r8(uint8_t u3, uint8_t r8, uint8_t *F, uint16_t *PC) {
   *F &= ~(1 << 6);
   *F |= 1 << 5;
   *PC = *PC + 2; // 2 byte opcode, add 2 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t call_cc_n16(int16_t n16, uint8_t F, uint8_t cc, uint16_t *SP, uint16_t *PC, uint8_t *mem_map) {
@@ -56,10 +56,10 @@ uint8_t call_cc_n16(int16_t n16, uint8_t F, uint8_t cc, uint16_t *SP, uint16_t *
     mem_map[*SP - 2] = PC_LOW;
     *PC = n16; // Jump to n16
     *SP = *SP - 2; // Subtract 2 from stack pointer
-    return 6; // Return number of cycles (in M-cycles)
+    return 24; // Return number of cycles (in t-cycles)
   }
   *PC = *PC + 3; // 3 byte opcode, add 3 to PC
-  return 3; // Return number of cycles (in M-cycles)
+  return 12; // Return number of cycles (in t-cycles)
 }
 
 uint8_t cp_A_n8_OR_r8(uint8_t A, uint8_t n8_OR_r8, uint8_t *F, uint16_t *PC, uint8_t is_n8) {
@@ -97,11 +97,11 @@ uint8_t cp_A_n8_OR_r8(uint8_t A, uint8_t n8_OR_r8, uint8_t *F, uint16_t *PC, uin
   switch (is_n8) {
     case 0: // r8
       *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-      return 1; // Return number of cycles (in M-cycles)
+      return 4; // Return number of cycles (in t-cycles)
       break;
     case 1: // n8
       *PC = *PC + 2; // 2 byte opcode, add 2 to PC
-      return 2; // Return number of cycles (in M-cycles)
+      return 8; // Return number of cycles (in t-cycles)
       break;
     default:
       printf("This shouldn't happen");
@@ -172,7 +172,7 @@ uint8_t dec_r8(uint8_t *r8, uint8_t *F, uint16_t *PC) {
       *F &= ~(1 << 7);
   }
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 1; // Return number of cycles (in M-cycles)
+  return 4; // Return number of cycles (in t-cycles)
 }
 
 uint8_t inc_HL(uint8_t *HL, uint8_t *F, uint16_t *PC, uint8_t mem_map) {
@@ -204,7 +204,7 @@ uint8_t inc_HL(uint8_t *HL, uint8_t *F, uint16_t *PC, uint8_t mem_map) {
       *F &= ~(1 << 7);
   }
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 3; // Return number of cycles (in M-cycles)
+  return 12; // Return number of cycles (in t-cycles)
 }
 
 uint8_t inc_r16(uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC) {
@@ -215,7 +215,7 @@ uint8_t inc_r16(uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC) {
   *r8_HIGH = (r16 >> 8) & 0xff;
   *r8_LOW = r16 & 0xff;
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t inc_r8(uint8_t *r8, uint8_t *F, uint16_t *PC) {
@@ -247,42 +247,42 @@ uint8_t inc_r8(uint8_t *r8, uint8_t *F, uint16_t *PC) {
       *F &= ~(1 << 7);
   }
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 1; // Return number of cycles (in M-cycles)
+  return 4; // Return number of cycles (in t-cycles)
 }
 
 uint8_t inc_SP(uint16_t *SP, uint16_t *PC) {
   // Increase SP by 1
   *SP = *SP + 1;
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_A_ff00_C(uint8_t *A, uint8_t C, uint16_t *PC, uint8_t *mem_map) {
   // Store 0xff00 + C in mem_map at A
   *A = mem_map[0xff00 + C];
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_A_ff00_n8(uint8_t *A, uint8_t n8, uint16_t *PC, uint8_t *mem_map) {
   // Store 0xff00 + n8 in mem_map at A
   *A = mem_map[0xff00 + n8];
   *PC = *PC + 2; // 2 byte opcode, add 2 to PC
-  return 3; // Return number of cycles (in M-cycles)
+  return 12; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_ff00_C_A(uint8_t A, uint8_t C, uint16_t *PC, uint8_t *mem_map) {
   // Store A at 0xff00 + C in mem_map
   mem_map[0xff00 + C] = A;
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_ff00_n8_A(uint8_t A, uint8_t n8, uint16_t *PC, uint8_t *mem_map) {
   // Store A at 0xff00 + n8 in mem_map
   mem_map[0xff00 + n8] = A;
   *PC = *PC + 2; // 2 byte opcode, add 2 to PC
-  return 3; // Return number of cycles (in M-cycles)
+  return 12; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_HLID_r8(uint8_t r8, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC, uint8_t *mem_map, uint8_t is_increment) {
@@ -306,14 +306,14 @@ uint8_t ld_HLID_r8(uint8_t r8, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC, 
   *r8_LOW = r16 & 0xff;
   // printf("HIGH (BDH): %02x LOW (CEL): %02x\n", *r8_HIGH, *r8_LOW); // DEBUG
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_n16_r8(uint8_t r8, uint16_t n16, uint16_t *PC, uint8_t *mem_map) {
   // Store r8 at memory n16 points to
   mem_map[n16] = r8;
   *PC = *PC + 3; // 3 byte opcode, add 3 to PC
-  return 4; // Return number of cycles (in M-cycles)
+  return 16; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_r16_r8(uint8_t r8, uint8_t r8_HIGH, uint8_t r8_LOW, uint16_t *PC, uint8_t *mem_map) {
@@ -321,7 +321,7 @@ uint8_t ld_r16_r8(uint8_t r8, uint8_t r8_HIGH, uint8_t r8_LOW, uint16_t *PC, uin
   uint16_t r16 = (r8_HIGH << 8) + r8_LOW; // Join r8_HIGH and r8_LOW
   mem_map[r16] = r8;
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_r8_HLID(uint8_t *r8, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC, uint8_t *mem_map, uint8_t is_increment) {
@@ -341,7 +341,7 @@ uint8_t ld_r8_HLID(uint8_t *r8, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC,
   *r8_HIGH = (r16 >> 8) & 0xff;
   *r8_LOW = r16 & 0xff;
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_r8_r16(uint8_t *r8, uint8_t r8_HIGH, uint8_t r8_LOW, uint16_t *PC, uint8_t *mem_map) {
@@ -351,14 +351,14 @@ uint8_t ld_r8_r16(uint8_t *r8, uint8_t r8_HIGH, uint8_t r8_LOW, uint16_t *PC, ui
   // printf("VAL r16 POINTS TO:%02x\n", mem_map[r16]); // DEBUG
   *r8 = mem_map[r16];
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_r8_dest_r8_src(uint8_t r8_src, uint8_t *r8_dest, uint16_t *PC) {
   // Set r8_dest to r8_src
   *r8_dest = r8_src;
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 1; // Return number of cycles (in M-cycles)
+  return 4; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_r16_n16(uint16_t n16, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC) {
@@ -372,7 +372,7 @@ uint8_t ld_r16_n16(uint16_t n16, uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *PC
   *r8_LOW = r16 & 0xff;
   // printf("HIGH (BDH): %02x LOW (CEL): %02x\n", *r8_HIGH, *r8_LOW); // DEBUG
   *PC = *PC + 3; // 3 byte opcode, add 3 to PC
-  return 3; // Return number of cycles (in M-cycles)
+  return 12; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_r8_n8(uint8_t n8, uint8_t *r8, uint16_t *PC) {
@@ -381,21 +381,21 @@ uint8_t ld_r8_n8(uint8_t n8, uint8_t *r8, uint16_t *PC) {
   *r8 = n8;
   // printf("r8: %02x\n", *r8); // DEBUG
   *PC = *PC + 2; // 2 byte opcode, add 2 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_r16_A(uint8_t *A, uint16_t r16, uint16_t *PC, uint8_t *mem_map) {
   // Set A to value r16 points to
   *A = mem_map[r16];
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ld_SP_n16(uint16_t n16, uint16_t *SP, uint16_t *PC) {
   // Set SP to n16
   *SP = n16;
   *PC = *PC + 3; // 3 byte opcode, add 3 to PC
-  return 3; // Return number of cycles (in M-cycles)
+  return 12; // Return number of cycles (in t-cycles)
 }
 
 uint8_t pop_r16(uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *SP, uint16_t *PC, uint8_t *mem_map) {
@@ -405,7 +405,7 @@ uint8_t pop_r16(uint8_t *r8_HIGH, uint8_t *r8_LOW, uint16_t *SP, uint16_t *PC, u
   *r8_HIGH = mem_map[*SP + 1];
   *SP = *SP + 2; // Add 2 to stack pointer
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 3; // Return number of cycles (in M-cycles)
+  return 12; // Return number of cycles (in t-cycles)
 }
 
 uint8_t push_r16(uint8_t r8_HIGH, uint8_t r8_LOW, uint16_t *SP, uint16_t *PC, uint8_t *mem_map) {
@@ -414,7 +414,7 @@ uint8_t push_r16(uint8_t r8_HIGH, uint8_t r8_LOW, uint16_t *SP, uint16_t *PC, ui
   mem_map[*SP - 2] = r8_LOW;
   *SP = *SP - 2; // Subtract 2 from stack pointer
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 4; // Return number of cycles (in M-cycles)
+  return 16; // Return number of cycles (in t-cycles)
 }
 
 uint8_t jr_cc_i8(int8_t i8, uint8_t F, uint8_t cc, uint16_t *PC, uint8_t *mem_map) {
@@ -427,10 +427,10 @@ uint8_t jr_cc_i8(int8_t i8, uint8_t F, uint8_t cc, uint16_t *PC, uint8_t *mem_ma
     *PC = *PC + i8;
     // printf("PC: %d\n", *PC); // DEBUG
     // exit(1); // DEBUG
-    return 3; // Return number of cycles (in M-cycles)
+    return 12; // Return number of cycles (in t-cycles)
   }
   *PC = *PC + 2; // 2 byte opcode, add 2 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ret(uint16_t *SP, uint16_t *PC, uint8_t *mem_map) {
@@ -444,7 +444,7 @@ uint8_t ret(uint16_t *SP, uint16_t *PC, uint8_t *mem_map) {
   *PC = (PC_HIGH << 8) + PC_LOW; // Join PC_HIGH and PC_LOW
   *SP = *SP + 2; // Add 2 to stack pointer
   // *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 4; // Return number of cycles (in M-cycles)
+  return 16; // Return number of cycles (in t-cycles)
 }
 
 uint8_t ret_cc(uint8_t F, uint8_t cc, uint16_t *SP, uint16_t *PC, uint8_t *mem_map) {
@@ -461,10 +461,10 @@ uint8_t ret_cc(uint8_t F, uint8_t cc, uint16_t *SP, uint16_t *PC, uint8_t *mem_m
     *PC = (PC_HIGH << 8) + PC_LOW; // Join PC_HIGH and PC_LOW
     *SP = *SP + 2; // Add 2 to stack pointer
     // *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-    return 5; // Return number of cycles (in M-cycles)
+    return 20; // Return number of cycles (in t-cycles)
   }
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t rlca(uint8_t *A, uint8_t *F, uint16_t *PC) {
@@ -492,7 +492,7 @@ uint8_t rlca(uint8_t *A, uint8_t *F, uint16_t *PC) {
   *F &= ~(1 << 6);
   *F &= ~(1 << 5);
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 1; // Return number of cycles (in M-cycles)
+  return 4; // Return number of cycles (in t-cycles)
 }
 
 uint8_t rl_r8(uint8_t *r8, uint8_t *F, uint16_t *PC) {
@@ -524,7 +524,7 @@ uint8_t rl_r8(uint8_t *r8, uint8_t *F, uint16_t *PC) {
   *F &= ~(1 << 6);
   *F &= ~(1 << 5);
   *PC = *PC + 2; // 2 byte opcode, add 2 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t rr_r8(uint8_t *r8, uint8_t *F, uint16_t *PC) {
@@ -556,7 +556,7 @@ uint8_t rr_r8(uint8_t *r8, uint8_t *F, uint16_t *PC) {
   *F &= ~(1 << 6);
   *F &= ~(1 << 5);
   *PC = *PC + 2; // 2 byte opcode, add 2 to PC
-  return 2; // Return number of cycles (in M-cycles)
+  return 8; // Return number of cycles (in t-cycles)
 }
 
 uint8_t xor_a_r8(uint8_t *A, uint8_t *r8, uint8_t *F, uint16_t *PC) {
@@ -567,7 +567,7 @@ uint8_t xor_a_r8(uint8_t *A, uint8_t *r8, uint8_t *F, uint16_t *PC) {
       *F |= 1 << 7;
   }
   *PC = *PC + 1; // 1 byte opcode, add 1 to PC
-  return 1; // Return number of cycles (in M-cycles)
+  return 4; // Return number of cycles (in t-cycles)
 }
 
 // Main function
@@ -593,7 +593,8 @@ int main(void) {
 
   // Reading Boot ROM into memory
   FILE *rom_ptr = 0;
-  rom_ptr = fopen("C:/Users/BellwetherWealth-Enq/Games/ROMs/GB/[BIOS] Nintendo Game Boy Boot ROM (World) (Rev 1).gb", "r");
+  // Open the file (remember to open as bytes "rb")
+  rom_ptr = fopen("C:/Users/BellwetherWealth-Enq/Games/ROMs/GB/[BIOS] Nintendo Game Boy Boot ROM (World) (Rev 1).gb", "rb");
   // File ptr, offset, where offset added (SEEK_SET, SEEK_CUR, SEEK_END)
   fseek(rom_ptr, 0, SEEK_SET); // Set place in file to read from
   // Memory ptr, size of each element (in bytes), number of elements, file ptr
@@ -603,7 +604,8 @@ int main(void) {
   //  Reading cartridge into memory (first 32kb minus first 256b that Boot ROM
   // is in, will overwrite after boot process)
   rom_ptr = 0;
-  rom_ptr = fopen("C:/Users/BellwetherWealth-Enq/Games/ROMs/GB/Dr. Mario (World).gb", "r");
+  // Open the file (remember to open as bytes "rb")
+  rom_ptr = fopen("C:/Users/BellwetherWealth-Enq/Games/ROMs/GB/Dr. Mario (World).gb", "rb");
   // File ptr, offset, where offset added (SEEK_SET, SEEK_CUR, SEEK_END)
   fseek(rom_ptr, 0x100, SEEK_SET); // Set place in file to read from
   // Memory ptr, size of each element (in bytes), number of elements, file ptr
@@ -615,12 +617,19 @@ int main(void) {
   uint32_t opcodes_run = 0;
   uint8_t cycles = 0;
   uint32_t total_cycles = 0;
+  // PPU ETC.
+  //uint16_t ppu_cycles = 0;
+  //uint8_t sprites_scanned = 0;
+  //uint8_t sprites_in_buffer = 0;
+  //uint8_t obj_penalty = 0;
+  //uint8_t wy_is_ly = 0;
 
-  // While loop for CPU fetch, decode, execute process
+  // While loop for emulation processes
   while (is_running == 1) {
+    // CPU Part
     // printf("Opcode: %02x\n", mem_map[PC]); // DEBUG: Print current byte in hex
     //  Switch statement that checks hex value of current byte, compares with
-    // opcode values, and then executes said opcode
+    // opcode values, and then executes said opcode (fetch, decode, execute)
     switch (mem_map[PC]) {
       case 0x00: PC++; cycles = 1; break;
       case 0x01:
@@ -1277,5 +1286,63 @@ int main(void) {
     //if (total_cycles >= 100000) { // DEBUG: To stop at a certain number of cycles
     //  debug(A, B, C, D, E, F, H, L, PC, SP, opcodes_run, total_cycles, mem_map, 0);
     //}
+
+    // // PPU Part
+    // for (int i = 0; i < cycles; i++) {
+    //   // Check if wy is ly, required for Mode 3
+    //   if (mem_map[0xff4a] == mem_map[0xff44]) {
+    //     wy_is_ly = 1;
+    //   }
+    //   // 
+    //   if (mem_map[0xff44] < 144) { // If ly is scanline 0-143, run PPU Modes
+    //     if (ppu_cycles < 80) { // PPU Mode 2 (OAM Scan)
+    //       // Search OAM memory for sprites to be rendered on current scanline
+    //       // First grab each byte for the sprite
+    //       uint8_t y_pos = mem_map[0xfe00 + sprites_scanned * 4];
+    //       uint8_t x_pos = mem_map[0xfe00 + sprites_scanned * 4 + 1];
+    //       uint8_t tile_number = mem_map[0xfe00 + sprites_scanned * 4 + 2];
+    //       uint8_t sprite_flags = mem_map[0xfe00 + sprites_scanned * 4 + 3];
+    //       uint8_t ly = mem_map[0xff44];
+    //       // Get height of sprite
+    //       switch ((mem_map[0xff40] >> 2) & 1) {
+    //         case 0:
+    //           uint8_t sprite_height = 8;
+    //           break;
+    //         case 1:
+    //           uint8_t sprite_height = 16;
+    //           break;
+    //         default:
+    //           printf("This shouldn't happen.");
+    //           exit(1); // Exit program with error
+    //       }
+    //       // Add to buffer if all conditions are true
+    //       if (x_pos > 0 && (ly + 16) >= y_pos && (ly + 16) < (y_pos + sprite_height) && sprites_in_buffer < 10) {
+    //         mem_map[0xc000 + sprites_in_buffer] = y_pos;
+    //         mem_map[0xc000 + sprites_in_buffer] = x_pos;
+    //         mem_map[0xc000 + sprites_in_buffer] = tile_number;
+    //         mem_map[0xc000 + sprites_in_buffer] = sprite_flags;
+    //         sprites_in_buffer = sprites_in_buffer + 1; // Add 1 to sprites in buffer
+    //       }
+    //     } else if (ppu_cycles >= 80 && ppu_cycles < 172 + obj_penalty) { // PPU Mode 3 (Drawing)
+    //       if (ppu_cycles - 80 < mem_map[0xff42] % 8) { // Background Scrolling Penalty
+    //         // Do nothing
+    //       } else if (((mem_map[0xff40] >> 5) & 1) == 1 && wy_is_ly == 1 && shifter_x_pos >= (mem_map[0xff4b] - 7)) { // Window Penalty (where is the shifter x-pos?)
+    //         // Do nothing
+    //       } else if (1 = 1) { // Object Penalty (still need to figure out)
+    //         // Do nothing
+    //       } else { // When penalties are not in effect (actually doing stuff)
+            
+    //       }
+    //     } else if (ppu_cycles >= 172 + obj_penalty && ppu_cycles < 456) { // PPU Mode 0 (H-Blank)
+    //       // Do nothing
+    //     }
+    //   } else if (mem_map[0xff44] >= 144) { // PPU Mode 1 (V-Blank) if ly 144-153
+    //     // Do nothing
+    //   } else {
+    //     printf("This shouldn't happen.");
+    //     exit(1); // Exit program with error
+    //   }
+    // }
+    // ppu_cycles = ppu_cycles + cycles;
   }
 }
