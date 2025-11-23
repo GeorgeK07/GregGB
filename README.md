@@ -14,6 +14,9 @@ This program was built and tested with:
 
 It will most likely work with newer or older versions and other operating systems, however, there may be some breaking changes that cause it not to build or run.
 
+## License
+This program is licensed under the GNU GPL-3.0-or-later
+
 ## Credits
 Thanks to emudev and the creators of the resources linked on Game Boy emulation\
 (https://emudev.org/system_resources)
